@@ -48,8 +48,8 @@ for(year in c(2012,2017)){
 
 
 acs <- acs %>%
-  rename(st_cty_fips=GEOID)
-st_write(test, "acs_.shp")
+  rename(GEOID=st_cty_fips)
+
 
 ##################################### 
 # Step 2: HMDA cleaning
@@ -104,10 +104,11 @@ st_write(test, "acs_.shp")
 # hmda <- bind_rows(hmda_total_mortg, hmda_2017_agg) 
 
 save(hmda, file = "hmda_final.Rda")
+hmda <- load("GEOG6305_data/hmda_final.Rda")
 ###################################
 # Step 3: Branch Data 
 ###################################
-branches_2012 <- read_csv("data/ALL_2012/All_2012.csv") %>% 
+branches_2012 <- read_csv("GEOG6305_data/data/ALL_2012/All_2012.csv") %>% 
   filter(BRSERTYP %in% c(11,12)) %>% 
   mutate(GEOID = str_pad(STCNTYBR, 5, "left", 0)) %>%
   group_by(YEAR, GEOID) %>% 
@@ -115,7 +116,7 @@ branches_2012 <- read_csv("data/ALL_2012/All_2012.csv") %>%
   select(year = YEAR, GEOID, num_branches2012) %>% 
   ungroup()
 
-branches_2017 <- read_csv("data/ALL_2017/All_2017.csv") %>%
+branches_2017 <- read_csv("GEOG6305_data/data/ALL_2017/All_2017.csv") %>%
   filter(BRSERTYP %in% c(11,12)) %>% 
   mutate(GEOID = str_pad(STCNTYBR, 5, "left", 0)) %>%
   group_by(YEAR, GEOID) %>% 
@@ -137,11 +138,19 @@ branches <- bind_rows(branches_2012 %>%
 
 ##################################
 # Step 4: Make into spatial dataset
+##################################
 df <- left_join(acs, hmda, by = c('year','GEOID')) %>% 
-  left_join(branches, by = c("year", "GEOID"))
+  left_join(branches, by = c("year", "GEOID")) %>% 
+  filter(!substr(GEOID,1,2) %in% c("02","15", "60", "66", "69", "72", "78"))
 
 counties <- counties()
-df_final <- geo_join(spatial_data = counties, data_frame = df, by_sp = "GEOID", by_df = "GEOID")
+df_final <- geo_join(spatial_data = counties, data_frame = df, by_sp = "GEOID", by_df = "GEOID", how = "inner")
 
-st_write(df_final, "df_final.shp")
+st_write(df_final, "GEOG6305_data/df_final.shp")
+
+################################# 
+# Additional cleaning after
+################################# 
+
+#df_final<-st_read("GEOG6305_data/df_final.shp")
 
