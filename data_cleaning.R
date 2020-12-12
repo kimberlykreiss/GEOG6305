@@ -130,6 +130,11 @@ change <- left_join(branches_2012 %>% select(-year), branches_2017 %>% select(-y
   mutate(branch_loss = if_else(change < 0, 1, 0)) %>% 
   select(GEOID, branch_loss)
 
+change_count <- left_join(branches_2012 %>% select(-year), branches_2017 %>% select(-year), by = 'GEOID') %>% 
+  mutate(change = num_branches2017 - num_branches2012) %>% 
+  mutate(branch_loss = if_else(change < 0, 1, 0)) %>% 
+  select(GEOID, change)
+
 branches <- bind_rows(branches_2012 %>% 
                         select(year, GEOID, branches = num_branches2012), branches_2017 %>% 
                         select(year, GEOID, branches = num_branches2017)) %>%
@@ -141,12 +146,18 @@ branches <- bind_rows(branches_2012 %>%
 ##################################
 df <- left_join(acs, hmda, by = c('year','GEOID')) %>% 
   left_join(branches, by = c("year", "GEOID")) %>% 
-  filter(!substr(GEOID,1,2) %in% c("02","15", "60", "66", "69", "72", "78"))
+  filter(!substr(GEOID,1,2) %in% c("02","15", "60", "66", "69", "72", "78")) %>% 
+  mutate(br_per_pop = branches/total_pop) %>% 
+  left_join(change_count, by = "GEOID")
 
 counties <- counties()
 df_final <- geo_join(spatial_data = counties, data_frame = df, by_sp = "GEOID", by_df = "GEOID", how = "inner")
 
 st_write(df_final, "GEOG6305_data/df_final.shp")
+df_final_2012 <- filter(df_final, year == 2012) 
+df_final_2017 <- filter(df_final, year == 2017) 
+st_write(df_final_2012, "GEOG6305_data/df_final_2012.shp")
+st_write(df_final_2017, "GEOG6305_data/df_final_2017.shp")
 
 ################################# 
 # Additional cleaning after
