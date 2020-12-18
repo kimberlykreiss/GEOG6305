@@ -21,7 +21,12 @@ for(year in c(2012,2017)){
                                                          "B25002_003", 
                                                          "B06012_002", 
                                                          "B25004_002", 
-                                                         "B25004_004"), year = year) %>%
+                                                         "B25004_004", 
+                                                         "B15002_001", 
+                                                         "B15002_015", "B15002_016", 
+                                                         "B15002_017", "B15002_018", 
+                                                         "B15002_032", "B15002_033", 
+                                                         "B15002_034", "B15002_035"), year = year) %>%
     
     select(-moe) %>%
     mutate(variable = case_when(variable == "B19013_001" ~ 'med_fam_inc',
@@ -37,7 +42,16 @@ for(year in c(2012,2017)){
                                 variable == "B25002_003" ~ "vach", 
                                 variable == "B06012_002" ~ "pov", 
                                 variable == "B25004_002" ~ "vacrent", 
-                                variable == "B25004_004" ~ "vacsale"),
+                                variable == "B25004_004" ~ "vacsale",
+                                variable == "B15002_015" ~ "male_ba", 
+                                variable == "B15002_016" ~ "male_masters", 
+                                variable == "B15002_017" ~ "male_prof", 
+                                variable == "B15002_018" ~ "male_phd", 
+                                variable == "B15002_032" ~ "female_ba", 
+                                variable == "B15002_033" ~ "female_masters", 
+                                variable == "B15002_034" ~ "female_prof", 
+                                variable == "B15002_035" ~ "female_phd", 
+                                variable == "B15002_001" ~ "total_25_pop"),
            year = year ) %>%
     pivot_wider(names_from = c(variable), values_from = c(estimate))
 
@@ -48,7 +62,10 @@ for(year in c(2012,2017)){
 
 
 acs <- acs %>%
-  rename(GEOID=st_cty_fips)
+#  rename(st_cty_fips=GEOID) %>% 
+  mutate(ba_higher = rowSums(across(male_ba:female_phd))) %>% 
+  mutate(share_ba_higher = ba_higher/total_25_pop) %>% 
+  mutate_at(vars(white:pov, hunits:vacsale), funs(sh = ./total_pop))
 
 
 ##################################### 
@@ -103,8 +120,8 @@ acs <- acs %>%
 #   mutate(year = 2012)
 # hmda <- bind_rows(hmda_total_mortg, hmda_2017_agg) 
 
-save(hmda, file = "hmda_final.Rda")
-hmda <- load("GEOG6305_data/hmda_final.Rda")
+#save(hmda, file = "hmda_final.Rda")
+load("GEOG6305_data/hmda_final.Rda")
 ###################################
 # Step 3: Branch Data 
 ###################################
@@ -148,7 +165,8 @@ df <- left_join(acs, hmda, by = c('year','GEOID')) %>%
   left_join(branches, by = c("year", "GEOID")) %>% 
   filter(!substr(GEOID,1,2) %in% c("02","15", "60", "66", "69", "72", "78")) %>% 
   mutate(br_per_pop = branches/total_pop) %>% 
-  left_join(change_count, by = "GEOID")
+  left_join(change_count, by = "GEOID") %>% 
+  mutate_at(vars(total_mortgages,branch_loss), funs(sh = ./total_pop))
 
 counties <- counties()
 df_final <- geo_join(spatial_data = counties, data_frame = df, by_sp = "GEOID", by_df = "GEOID", how = "inner")
@@ -165,3 +183,5 @@ st_write(df_final_2017, "GEOG6305_data/df_final_2017.shp")
 
 #df_final<-st_read("GEOG6305_data/df_final.shp")
 
+reg1 <- lm(total_mortgages ~ branch_loss + hunits + med_fam_inc + total_pop + black + hispanic, data = df_final_2017)
+summary(reg1)
